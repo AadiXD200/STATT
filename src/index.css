@@ -1,0 +1,39 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Light mode colors (default when no dark class) */
+    --color-background: #FFFFFF;
+    --color-surface: #FAFAFA;
+    --color-border: #E0E0E0;
+    --color-border-light: #CCCCCC;
+    --color-text-primary: #050505;
+    --color-text-secondary: #333333;
+    --color-text-tertiary: #666666;
+    --color-accent-green: #00FF94;
+    --color-accent-red: #FF3333;
+    --color-accent-blue: #3399FF;
+  }
+
+  .dark {
+    /* Dark mode colors */
+    --color-background: #050505;
+    --color-surface: #111111;
+    --color-border: #333333;
+    --color-border-light: #444444;
+    --color-text-primary: #FFFFFF;
+    --color-text-secondary: #999999;
+    --color-text-tertiary: #666666;
+    --color-accent-green: #00FF94;
+    --color-accent-red: #FF3333;
+    --color-accent-blue: #3399FF;
+  }
+
+  * {
+    transition-property: background-color, border-color, color;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 200ms;
+  }
+}
