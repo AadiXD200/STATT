@@ -1,0 +1,352 @@
+/* Full Screen Map Styles */
+.fullscreen-map-container {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #0f172a;
+}
+
+.map-canvas {
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+/* Top Overlay Bar */
+.top-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 32px;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.95) 0%, rgba(15, 23, 42, 0.8) 50%, transparent 100%);
+  backdrop-filter: blur(10px);
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.overlay-left,
+.overlay-right {
+  pointer-events: auto;
+}
+
+.overlay-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.map-title {
+  font-size: 28px;
+  font-weight: 800;
+  color: #f1f5f9;
+  margin: 0;
+  letter-spacing: -0.5px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.hospital-count {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: rgba(59, 130, 246, 0.2);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 24px;
+  backdrop-filter: blur(8px);
+}
+
+.count-number {
+  font-size: 20px;
+  font-weight: 700;
+  color: #3b82f6;
+}
+
+.count-text {
+  font-size: 13px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.legend {
+  display: flex;
+  gap: 20px;
+  padding: 10px 20px;
+  background: rgba(30, 41, 59, 0.9);
+  border: 1px solid #475569;
+  border-radius: 28px;
+  backdrop-filter: blur(12px);
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #cbd5e1;
+  font-weight: 500;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+}
+
+.legend-dot.low {
+  background: #10b981;
+}
+
+.legend-dot.medium {
+  background: #f59e0b;
+}
+
+.legend-dot.high {
+  background: #ef4444;
+}
+
+/* Stats Overlay */
+.stats-overlay {
+  position: absolute;
+  top: 100px;
+  left: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  z-index: 1000;
+}
+
+.stat-card {
+  background: rgba(30, 41, 59, 0.95);
+  border: 1px solid #475569;
+  border-radius: 16px;
+  padding: 16px 20px;
+  backdrop-filter: blur(12px);
+  min-width: 120px;
+  text-align: center;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.stat-card:hover {
+  background: rgba(51, 65, 85, 0.95);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.stat-value {
+  font-size: 32px;
+  font-weight: 800;
+  color: #f1f5f9;
+  line-height: 1;
+  margin-bottom: 6px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #94a3b8;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Instructions */
+.instructions {
+  position: absolute;
+  bottom: 32px;
+  left: 32px;
+  background: rgba(30, 41, 59, 0.95);
+  border: 1px solid #475569;
+  border-radius: 16px;
+  padding: 20px;
+  backdrop-filter: blur(12px);
+  z-index: 1000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.instruction-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  color: #cbd5e1;
+  margin-bottom: 8px;
+}
+
+.instruction-item:last-child {
+  margin-bottom: 0;
+}
+
+.instruction-icon {
+  font-size: 16px;
+}
+
+/* Custom Marker Styles */
+.fullscreen-marker {
+  background: transparent !important;
+  border: none !important;
+}
+
+.marker-container {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.marker-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+  transition: all 0.3s ease;
+  z-index: 2;
+  position: relative;
+}
+
+.marker-pulse {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid;
+  opacity: 0;
+  animation: pulse 2s infinite;
+  z-index: 1;
+}
+
+.marker-label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 11px;
+  font-weight: 700;
+  color: white;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+  z-index: 3;
+  pointer-events: none;
+}
+
+.marker-hover .marker-dot {
+  transform: scale(1.4);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.marker-hover .marker-pulse {
+  opacity: 0.7;
+}
+
+@keyframes pulse {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.7;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.5);
+    opacity: 0.2;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.7;
+  }
+}
+
+/* Dark theme for Leaflet */
+.leaflet-container {
+  background: #0f172a !important;
+  font-family: system-ui, -apple-system, sans-serif !important;
+}
+
+/* Hide all popups completely */
+.leaflet-popup,
+.leaflet-popup-pane,
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Zoom controls positioning */
+.leaflet-control-zoom {
+  top: 100px !important;
+  right: 32px !important;
+  border: none !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+}
+
+.leaflet-control-zoom a {
+  background: rgba(30, 41, 59, 0.95) !important;
+  color: #f1f5f9 !important;
+  border: 1px solid #475569 !important;
+  border-radius: 8px !important;
+  transition: all 0.2s ease !important;
+  backdrop-filter: blur(8px) !important;
+  margin-bottom: 8px !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background: rgba(51, 65, 85, 0.95) !important;
+  transform: scale(1.05);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .top-overlay {
+    padding: 16px 20px;
+    flex-direction: column;
+    gap: 16px;
+    align-items: flex-start;
+  }
+  
+  .map-title {
+    font-size: 22px;
+  }
+  
+  .stats-overlay {
+    top: 140px;
+    left: 20px;
+    flex-direction: row;
+    gap: 8px;
+  }
+  
+  .stat-card {
+    min-width: 80px;
+    padding: 12px 16px;
+  }
+  
+  .stat-value {
+    font-size: 24px;
+  }
+  
+  .instructions {
+    bottom: 20px;
+    left: 20px;
+    right: 20px;
+    padding: 16px;
+  }
+  
+  .legend {
+    gap: 12px;
+    padding: 8px 16px;
+  }
+  
+  .legend-item {
+    font-size: 12px;
+  }
+}
