@@ -84,9 +84,15 @@ export function SearchOverlay({ hospitals, onClose, onSelect, filters, onFilterC
               const totalMinutes = (hospital.current_wait?.wait_minutes || 0) +
                                   (hospital.current_wait?.drive_minutes || 0);
               const formatTime = (minutes: number) => {
+                if (minutes < 60) {
+                  return `${minutes} min`;
+                }
                 const hours = Math.floor(minutes / 60);
                 const mins = minutes % 60;
-                return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+                if (mins === 0) {
+                  return `${hours} hr`;
+                }
+                return `${hours} hr ${mins} min`;
               };
 
               const isBest = bestHospitalId && hospital.id === bestHospitalId;

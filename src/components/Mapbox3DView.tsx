@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import type { HospitalWithWaitTime } from '../lib/types';
 import { fetchMedicalIncidents, type MedicalIncident } from '../lib/fireIncidents';
+import { analyzeIncidentImpact, type HospitalIncidentAnalysis } from '../lib/incidentAnalysis';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 // Mapbox access token
@@ -12,6 +13,19 @@ interface Mapbox3DViewProps {
   onHospitalSelect: (hospital: HospitalWithWaitTime) => void;
   selectedHospital?: HospitalWithWaitTime | null;
   onBestHospitalChange?: (hospitalId: string | null) => void;
+}
+
+// Helper function to format minutes as hours and minutes
+function formatTime(minutes: number): string {
+  if (minutes < 60) {
+    return `${minutes} min`;
+  }
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (mins === 0) {
+    return `${hours} hr`;
+  }
+  return `${hours} hr ${mins} min`;
 }
 
 export function Mapbox3DView({ hospitals, onHospitalSelect, selectedHospital, onBestHospitalChange }: Mapbox3DViewProps) {
@@ -25,6 +39,8 @@ export function Mapbox3DView({ hospitals, onHospitalSelect, selectedHospital, on
   const routeLayerRef = useRef<boolean>(false);
   const [bestHospital, setBestHospital] = useState<{hospital: HospitalWithWaitTime, travelTime: number, totalTime: number} | null>(null);
   const [medicalIncidents, setMedicalIncidents] = useState<MedicalIncident[]>([]);
+  const [incidentAnalysis, setIncidentAnalysis] = useState<Map<string, HospitalIncidentAnalysis>>(new Map());
+  const [showingOptimalPath, setShowingOptimalPath] = useState(false);
 
   // Initialize map
   useEffect(() => {
@@ -185,6 +201,18 @@ export function Mapbox3DView({ hospitals, onHospitalSelect, selectedHospital, on
 
     calculateBestHospital();
   }, [userLocation, hospitals, onBestHospitalChange]);
+
+  // Analyze incident impact on hospitals
+  useEffect(() => {
+    if (hospitals.length === 0 || medicalIncidents.length === 0) {
+      setIncidentAnalysis(new Map());
+      return;
+    }
+
+    const analysis = analyzeIncidentImpact(hospitals, medicalIncidents);
+    setIncidentAnalysis(analysis);
+    console.log('Incident analysis updated:', analysis);
+  }, [hospitals, medicalIncidents]);
 
   // Fetch medical incidents for heat map
   useEffect(() => {
@@ -417,6 +445,9 @@ export function Mapbox3DView({ hospitals, onHospitalSelect, selectedHospital, on
       
       // Check if this is the best hospital
       const isBestHospital = bestHospital?.hospital.id === hospital.id;
+      
+      // Get incident analysis for this hospital
+      const analysis = incidentAnalysis.get(hospital.id);
 
       // Create marker dot
       const markerDot = document.createElement('div');
@@ -436,7 +467,7 @@ export function Mapbox3DView({ hospitals, onHospitalSelect, selectedHospital, on
         transition: transform 0.3s ease, box-shadow 0.3s ease;
         position: relative;
       `;
-      markerDot.innerHTML = hospital.type === 'urgent_care' ? 'U' : 'E';
+      markerDot.innerHTML = hospital.type === 'urgent_care' ? 'U' : '';
 
       // Add star badge if this is the best hospital
       if (isBestHospital) {
@@ -553,13 +584,13 @@ export function Mapbox3DView({ hospitals, onHospitalSelect, selectedHospital, on
               </div>
               <div style="color: #92400e; font-size: 13px; line-height: 1.5;">
                 <div style="margin-bottom: 6px;">
-                  <strong>Total Time:</strong> ${bestHospital.totalTime} minutes
+                  <strong>Total Time:</strong> ${formatTime(bestHospital.totalTime)}
                 </div>
                 <div style="margin-bottom: 6px;">
-                  • Travel Time: ${bestHospital.travelTime} min
+                  • Travel Time: ${formatTime(bestHospital.travelTime)}
                 </div>
                 <div style="margin-bottom: 6px;">
-                  • Wait Time: ${hospital.current_wait?.wait_minutes || 0} min
+                  • Wait Time: ${formatTime(hospital.current_wait?.wait_minutes || 0)}
                 </div>
                 <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #fbbf24; font-size: 12px;">
                   This hospital has the shortest combined travel + wait time from your location.
@@ -575,13 +606,16 @@ export function Mapbox3DView({ hospitals, onHospitalSelect, selectedHospital, on
                 <circle cx="12" cy="12" r="10"/>
                 <polyline points="12 6 12 12 16 14"/>
               </svg>
-              <span style="
-                color: #ef4444;
-                font-size: 20px;
-                font-weight: 600;
-              ">
-                ${Math.floor(hospital.current_wait.wait_minutes / 60)}h ${hospital.current_wait.wait_minutes % 60}m
-              </span>
+              <div style="display: flex; flex-direction: column; gap: 2px;">
+                <span style="color: #64748b; font-size: 12px; font-weight: 500;">Wait Time</span>
+                <span style="
+                  color: #ef4444;
+                  font-size: 20px;
+                  font-weight: 600;
+                ">
+                  ${formatTime(hospital.current_wait.wait_minutes)}
+                </span>
+              </div>
             </div>
           ` : ''}
 
@@ -629,6 +663,33 @@ export function Mapbox3DView({ hospitals, onHospitalSelect, selectedHospital, on
               ` : ''}
             </div>
           ` : ''}
+          
+          <!-- Expected Load from Medical Incidents -->
+          ${analysis && analysis.expectedPatients > 0 ? `
+            <div style="
+              background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+              border: 2px solid #f59e0b;
+              border-radius: 8px;
+              padding: 12px;
+              margin: 16px 0;
+            ">
+              <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <span style="font-size: 18px;">🚨</span>
+                <span style="color: #92400e; font-weight: 700; font-size: 13px;">Incoming Emergency Calls</span>
+              </div>
+              <div style="color: #92400e; font-size: 12px; line-height: 1.5;">
+                <div style="margin-bottom: 6px;">
+                  <strong>Expected Patients:</strong> +${analysis.expectedPatients}
+                </div>
+                <div style="margin-bottom: 6px;">
+                  <strong>Expected Wait Increase:</strong> +${formatTime(analysis.expectedWaitTimeIncrease)}
+                </div>
+                <div style="padding-top: 6px; border-top: 1px solid #f59e0b;">
+                  <strong>Total Expected Wait:</strong> ${formatTime(analysis.totalExpectedWaitTime)}
+                </div>
+              </div>
+            </div>
+          ` : ''}
 
           <!-- Tags -->
           ${hospital.pediatric || hospital.trauma_level ? `
@@ -658,7 +719,7 @@ export function Mapbox3DView({ hospitals, onHospitalSelect, selectedHospital, on
               align-items: center;
               justify-content: center;
               gap: 8px;
-              margin: 12px 0;
+              margin: 12px 0 8px 0;
             "
             onmouseover="this.style.background='#2563eb'"
             onmouseout="this.style.background='#3b82f6'"
@@ -669,6 +730,37 @@ export function Mapbox3DView({ hospitals, onHospitalSelect, selectedHospital, on
             </svg>
             Get Directions
           </button>
+          
+          <!-- Google Maps Directions Button -->
+          <a 
+            href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(hospital.address)}&travelmode=driving"
+            target="_blank"
+            rel="noopener noreferrer"
+            style="
+              width: 100%;
+              padding: 10px;
+              background: #34a853;
+              color: white;
+              border: none;
+              border-radius: 8px;
+              font-size: 13px;
+              font-weight: 600;
+              cursor: pointer;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              gap: 8px;
+              margin: 0 0 12px 0;
+              text-decoration: none;
+            "
+            onmouseover="this.style.background='#2d8e47'"
+            onmouseout="this.style.background='#34a853'"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+            </svg>
+            View on Google Maps
+          </a>
           
           <!-- Last Updated -->
           ${hospital.current_wait?.timestamp ? `
@@ -821,7 +913,7 @@ export function Mapbox3DView({ hospitals, onHospitalSelect, selectedHospital, on
                   <span style="color: #1e40af; font-weight: 600; font-size: 13px;">Route Information</span>
                 </div>
                 <div style="color: #1e40af; font-size: 14px;">
-                  <strong>ETA:</strong> ${etaMinutes} min (${distanceKm} km)
+                  <strong>ETA:</strong> ${formatTime(etaMinutes)} (${distanceKm} km)
                 </div>
               </div>
             `;
@@ -925,6 +1017,76 @@ export function Mapbox3DView({ hospitals, onHospitalSelect, selectedHospital, on
             <span className="text-gray-300 text-sm">&gt; 3 hours</span>
           </div>
         </div>
+        
+        {/* Most Optimum Hospital Button */}
+        <button
+          onClick={() => {
+            if (showingOptimalPath) {
+              // Remove route and return to 3D view
+              if (mapRef.current && routeLayerRef.current) {
+                if (mapRef.current.getLayer('route')) {
+                  mapRef.current.removeLayer('route');
+                }
+                if (mapRef.current.getSource('route')) {
+                  mapRef.current.removeSource('route');
+                }
+                routeLayerRef.current = false;
+              }
+              
+              // Return to 3D mode
+              if (mapRef.current) {
+                if (!is3D) {
+                  setIs3D(true);
+                }
+                mapRef.current.easeTo({
+                  pitch: 60,
+                  bearing: -10,
+                  duration: 1000
+                });
+                if (!mapRef.current.getTerrain()) {
+                  mapRef.current.setTerrain({ source: 'mapbox-dem', exaggeration: 1.5 });
+                }
+              }
+              
+              setShowingOptimalPath(false);
+            } else if (bestHospital && mapRef.current && bestHospital.hospital.lng && bestHospital.hospital.lat) {
+              // Fly to the best hospital
+              mapRef.current.flyTo({
+                center: [bestHospital.hospital.lng, bestHospital.hospital.lat],
+                zoom: 15,
+                pitch: 60,
+                duration: 2000
+              });
+              
+              // Select the hospital to open its popup
+              onHospitalSelect(bestHospital.hospital);
+              
+              // Automatically trigger directions
+              setTimeout(() => {
+                if (typeof (window as any).getDirections === 'function') {
+                  (window as any).getDirections(
+                    bestHospital.hospital.id,
+                    bestHospital.hospital.lng,
+                    bestHospital.hospital.lat
+                  );
+                }
+              }, 500);
+              
+              setShowingOptimalPath(true);
+            }
+          }}
+          disabled={!bestHospital}
+          className={`w-full mt-3 px-3 py-1.5 font-semibold text-[10px] rounded transition-colors flex items-center justify-center gap-1.5 ${
+            bestHospital 
+              ? showingOptimalPath
+                ? 'bg-red-500 hover:bg-red-600 text-white cursor-pointer'
+                : 'bg-emerald-500 hover:bg-emerald-600 text-white cursor-pointer'
+              : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+          }`}
+        >
+          <span className="text-xs">{showingOptimalPath ? '✕' : '🏆'}</span>
+          <span>{showingOptimalPath ? 'Clear Route' : 'Best Hospital'}</span>
+        </button>
       </div>
 
       {/* Custom Popup Styles */}
