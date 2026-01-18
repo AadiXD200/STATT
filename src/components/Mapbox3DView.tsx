@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import type { HospitalWithWaitTime } from '../lib/types';
+import { fetchMedicalIncidents, type MedicalIncident } from '../lib/fireIncidents';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 // Mapbox access token
@@ -23,6 +24,7 @@ export function Mapbox3DView({ hospitals, onHospitalSelect, selectedHospital, on
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const routeLayerRef = useRef<boolean>(false);
   const [bestHospital, setBestHospital] = useState<{hospital: HospitalWithWaitTime, travelTime: number, totalTime: number} | null>(null);
+  const [medicalIncidents, setMedicalIncidents] = useState<MedicalIncident[]>([]);
 
   // Initialize map
   useEffect(() => {
@@ -183,6 +185,193 @@ export function Mapbox3DView({ hospitals, onHospitalSelect, selectedHospital, on
 
     calculateBestHospital();
   }, [userLocation, hospitals, onBestHospitalChange]);
+
+  // Fetch medical incidents for heat map
+  useEffect(() => {
+    const loadMedicalIncidents = async () => {
+      console.log('Fetching medical incidents...');
+      const incidents = await fetchMedicalIncidents();
+      console.log('Medical incidents fetched:', incidents.length, incidents);
+      setMedicalIncidents(incidents);
+    };
+
+    loadMedicalIncidents();
+    
+    // Refresh every 5 minutes (Toronto Fire updates every 5 minutes)
+    const interval = setInterval(loadMedicalIncidents, 5 * 60 * 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
+
+  // Add/update heat map layer
+  useEffect(() => {
+    if (!mapRef.current || !mapLoaded || medicalIncidents.length === 0) {
+      return;
+    }
+
+    const map = mapRef.current;
+
+    // Remove existing heat map layer if it exists
+    if (map.getLayer('medical-heat')) {
+      map.removeLayer('medical-heat');
+    }
+    if (map.getSource('medical-incidents')) {
+      map.removeSource('medical-incidents');
+    }
+
+    // Create GeoJSON from medical incidents
+    const geojson: GeoJSON.FeatureCollection = {
+      type: 'FeatureCollection',
+      features: medicalIncidents.map(incident => ({
+        type: 'Feature',
+        properties: {
+          event_num: incident.event_num,
+          postal_code: incident.postal_code,
+          dispatch_time: incident.dispatch_time,
+        },
+        geometry: {
+          type: 'Point',
+          coordinates: [incident.lng!, incident.lat!]
+        }
+      }))
+    };
+
+    console.log('GeoJSON created:', geojson);
+
+    try {
+      // Add source
+      map.addSource('medical-incidents', {
+        type: 'geojson',
+        data: geojson
+      });
+
+      console.log('Source added successfully');
+
+      // Add heat map layer
+      map.addLayer({
+        id: 'medical-heat',
+        type: 'heatmap',
+        source: 'medical-incidents',
+        maxzoom: 18,
+        paint: {
+          // Increase weight
+          'heatmap-weight': 1,
+          // Increase intensity as zoom level increases
+          'heatmap-intensity': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            0, 1,
+            18, 5
+          ],
+          // Color ramp for heatmap (red for medical emergencies)
+          'heatmap-color': [
+            'interpolate',
+            ['linear'],
+            ['heatmap-density'],
+            0, 'rgba(0, 0, 255, 0)',
+            0.1, 'rgb(0, 255, 0)',
+            0.3, 'rgb(255, 255, 0)',
+            0.5, 'rgb(255, 165, 0)',
+            0.7, 'rgb(255, 69, 0)',
+            1, 'rgb(255, 0, 0)'
+          ],
+          // Adjust radius by zoom level
+          'heatmap-radius': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            0, 10,
+            18, 50
+          ],
+          // Opacity
+          'heatmap-opacity': 0.8
+        }
+      });
+
+      console.log('Heat map layer added successfully');
+
+      // Add circle layer for individual incidents (visible at higher zoom levels)
+      map.addLayer({
+        id: 'medical-incidents-circle',
+        type: 'circle',
+        source: 'medical-incidents',
+        minzoom: 10,
+        paint: {
+          'circle-radius': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            10, 4,
+            18, 8
+          ],
+          'circle-color': '#ff0000',
+          'circle-opacity': 0.6,
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#ffffff'
+        }
+      });
+
+      // Add hover effect
+      map.on('mouseenter', 'medical-incidents-circle', () => {
+        map.getCanvas().style.cursor = 'pointer';
+      });
+
+      map.on('mouseleave', 'medical-incidents-circle', () => {
+        map.getCanvas().style.cursor = '';
+      });
+
+      // Show popup on hover
+      const popup = new mapboxgl.Popup({
+        closeButton: false,
+        closeOnClick: false,
+        className: 'medical-incident-popup'
+      });
+
+      map.on('mousemove', 'medical-incidents-circle', (e) => {
+        if (e.features && e.features.length > 0) {
+          const feature = e.features[0];
+          const props = feature.properties;
+          
+          if (!props) return;
+          
+          const coordinates = (feature.geometry as any).coordinates.slice();
+          const dispatchTime = new Date(props.dispatch_time).toLocaleString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          });
+
+          popup
+            .setLngLat(coordinates)
+            .setHTML(`
+              <div style="padding: 8px; min-width: 200px;">
+                <div style="font-weight: bold; color: #ef4444; margin-bottom: 4px;">🚨 Medical Emergency</div>
+                <div style="font-size: 12px; color: #64748b; margin-bottom: 2px;">
+                  <strong>Event:</strong> ${props.event_num}
+                </div>
+                <div style="font-size: 12px; color: #64748b; margin-bottom: 2px;">
+                  <strong>Location:</strong> ${props.postal_code}
+                </div>
+                <div style="font-size: 12px; color: #64748b;">
+                  <strong>Dispatched:</strong> ${dispatchTime}
+                </div>
+              </div>
+            `)
+            .addTo(map);
+        }
+      });
+
+      map.on('mouseleave', 'medical-incidents-circle', () => {
+        popup.remove();
+      });
+
+      console.log('Circle layer and hover interactions added');
+    } catch (error) {
+      console.error('Error adding heat map:', error);
+    }
+  }, [mapLoaded, medicalIncidents]);
 
   // Add/update markers when hospitals change or map loads
   useEffect(() => {
@@ -719,18 +908,8 @@ export function Mapbox3DView({ hospitals, onHospitalSelect, selectedHospital, on
       {/* Map Container - Full Screen */}
       <div ref={mapContainerRef} className="w-full h-full" />
 
-
-      {/* Hospital Count Badge */}
-      <div className="absolute top-4 left-4 bg-slate-900/90 backdrop-blur-sm border border-slate-700 rounded-lg px-4 py-2 shadow-lg z-10">
-        <div className="flex items-center gap-2">
-          <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-          <span className="text-white font-semibold">{hospitals.length}</span>
-          <span className="text-gray-400 text-sm">hospitals</span>
-        </div>
-      </div>
-
-      {/* Legend */}
-      <div className="absolute top-24 left-4 bg-slate-900 border border-slate-700 rounded-lg p-4 shadow-lg z-[1000]">
+      {/* Wait Times Legend */}
+      <div className="absolute top-4 left-4 bg-background/95 backdrop-blur-sm border border-border p-4 font-mono text-xs z-10">
         <div className="text-sm font-semibold text-white mb-3">Wait Times</div>
         <div className="space-y-2">
           <div className="flex items-center gap-3">

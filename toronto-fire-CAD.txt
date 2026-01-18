@@ -1,0 +1,66 @@
+#!/bin/ksh93
+
+# From https://www.toronto.ca/community-people/public-safety-alerts/alerts-notifications/toronto-fire-active-incidents/ :
+#
+#  The following active incidents are dispatched from Toronto Fire Services
+#  Communication Centre. The contents are updated at five minute intervals
+#  from the CAD (Computer Aided Dispatch) system.
+#
+# https://www.toronto.ca/data/fire/livecad.xml is the machine-readable
+# version of the tabular information at the first link.  Apparently the
+# update frequency is "every five minutes", so let's assume we're polling
+# every 2.5 minutes (though of course this will be up to the cron job to
+# actually implement).
+#
+# The result will be a directory of pairs of files (XML and headers)
+# unique per retrieval but potentially duplicated in time.  This program
+# should thus be complemented by a second half which iterates over that
+# structure to pull out status updates and potentially populate a nicely
+# queryable database.
+
+typeset    dir_data dir_retr dir_dest url_xml fn_xml fn_hdr lock
+typeset -i ret verbose
+typeset -a opts_{mkdir,curl,mv}
+
+dir_data=/home/gnomon/.toronto-fire-CAD
+url_xml='https://www.toronto.ca/data/fire/livecad.xml'
+fn_xml='livecad.xml'
+fn_hdr='livecad.http'
+lock='.in_use'
+
+verbose=0
+
+# FIXME: above and right here are where configuration management code
+# is going to live, including bits which inherit from the environment,
+# bits which read from implicit system-wide and user-specific config
+# files, and command-line parameters (in that order).
+
+if   ((verbose > 1)) ; then
+	opts_curl+=(  '-v' '--trace-time' '-#' )
+	opts_mkdir+=( '-v' )
+	opts_mv+=(    '-v' )
+elif ((verbose == 0)) ; then
+	opts_curl+=( '-s' )
+fi
+
+printf '%(%s.%N)T.%d' now $$ | read dir_retr
+
+dir_dest="${dir_data}/${dir_retr}"
+
+opts_mkdir+=( '-p' '--' "${dir_data}/${dir_retr}${lock}" )
+
+mkdir "${opts_mkdir[@]}" || exit 1
+
+opts_curl+=( \
+  '-D' "${dir_dest}${lock}/${fn_hdr}"
+  '-o' "${dir_dest}${lock}/${fn_xml}"
+  '--' "$url_xml"
+)
+
+curl "${opts_curl[@]}" || exit 2
+
+mv "${mv_opts[@]}" -- "${dir_dest}${lock}" "${dir_dest}" || exit 3
+
+# FIXME: this is where the iteration over the directory structure, the
+# change detection (timestamp/ETag:/hash/content), and the database
+# population will eventually live.
